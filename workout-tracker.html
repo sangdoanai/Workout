@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRIND — Workout Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --surface2: #1a1a1a;
+    --border: #222222;
+    --green: #00ff87;
+    --green-dim: rgba(0,255,135,0.12);
+    --green-glow: rgba(0,255,135,0.35);
+    --text: #f0f0f0;
+    --text-muted: #555;
+    --text-mid: #888;
+    --streak-gold: #ffd700;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 480px; margin: 0 auto; padding: 0 0 80px; }
+
+  /* HEADER */
+  header {
+    padding: 24px 20px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--text-muted); text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .tagline {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 36px; letter-spacing: 3px;
+    color: var(--text); line-height: 1;
+  }
+  .tagline .beast { color: var(--green); text-shadow: 0 0 16px var(--green-glow); }
+  .today-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+    letter-spacing: 2px; text-transform: uppercase;
+    margin-top: 8px;
+  }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--text-muted); text-transform: uppercase;
+    padding: 24px 20px 10px;
+  }
+
+  /* TODAY CARD */
+  .today-card {
+    margin: 0 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .exercise-row {
+    padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.3s;
+  }
+  .exercise-row.done { background: var(--green-dim); }
+
+  .ex-info { flex: 1; }
+  .ex-name { font-size: 16px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .ex-target {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .ex-target .tnum { color: var(--green); }
+
+  .rep-input-wrap { display: flex; align-items: center; gap: 10px; }
+
+  /* NUMBER INPUT */
+  .rep-input {
+    width: 76px; height: 52px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .rep-input::-webkit-outer-spin-button,
+  .rep-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .rep-input:focus { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-dim); }
+  .rep-input.at-goal {
+    color: var(--green); border-color: rgba(0,255,135,0.4);
+    box-shadow: 0 0 12px var(--green-glow);
+  }
+
+  .check-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%; background: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transform: scale(0);
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    flex-shrink: 0;
+  }
+  .check-icon.show { opacity: 1; transform: scale(1); }
+  .check-icon svg { width: 12px; height: 12px; }
+
+  /* SHOULDER */
+  .shoulder-section { background: var(--surface); }
+  .shoulder-header {
+    padding: 14px 20px 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--text-muted); letter-spacing: 2px;
+    text-transform: uppercase;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .shoulder-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+  .shoulder-parts { display: flex; }
+  .shoulder-part {
+    flex: 1; padding: 14px 10px 16px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .shoulder-part:last-child { border-right: none; }
+  .part-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; color: var(--text-muted); letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .part-rep-input {
+    width: 64px; height: 48px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, color 0.2s;
+    -moz-appearance: textfield;
+  }
+  .part-rep-input::-webkit-outer-spin-button,
+  .part-rep-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .part-rep-input:focus { border-color: var(--green); box-shadow: 0 0 0 2px var(--green-dim); }
+  .part-rep-input.at-goal {
+    color: var(--green); border-color: rgba(0,255,135,0.4);
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+
+  .shoulder-footer {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--text-muted);
+  }
+  .shoulder-footer .tnum { color: var(--green); }
+
+  /* SAVE */
+  .save-btn {
+    margin: 16px 16px 0;
+    width: calc(100% - 32px);
+    padding: 15px;
+    background: var(--green);
+    color: #000; font-weight: 700; font-size: 13px;
+    border: none; border-radius: 10px; cursor: pointer;
+    font-family: 'DM Mono', monospace; letter-spacing: 3px;
+    text-transform: uppercase; transition: all 0.2s;
+  }
+  .save-btn:hover { background: #00ffaa; box-shadow: 0 0 20px var(--green-glow); }
+  .save-btn:active { transform: scale(0.98); }
+  .save-btn.saved { background: var(--surface2); color: var(--green); border: 1px solid var(--green); }
+
+  /* STREAK */
+  .streak-card {
+    margin: 0 16px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    display: flex; align-items: center; gap: 16px;
+  }
+  .streak-number {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 64px; line-height: 1;
+    color: var(--streak-gold);
+    text-shadow: 0 0 20px rgba(255,215,0,0.4);
+    min-width: 80px; text-align: center;
+  }
+  .streak-info { flex: 1; }
+  .streak-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 3px;
+    color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px;
+  }
+  .streak-desc { font-size: 13px; color: var(--text-mid); line-height: 1.5; }
+  .streak-milestones { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .milestone {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    padding: 3px 8px; border-radius: 20px; border: 1px solid var(--border);
+    color: var(--text-muted); transition: all 0.3s;
+  }
+  .milestone.reached { border-color: var(--streak-gold); color: var(--streak-gold); background: rgba(255,215,0,0.08); }
+  .milestone.next { border-color: var(--text-muted); color: var(--text-mid); animation: pulse-border 2s ease-in-out infinite; }
+  @keyframes pulse-border { 0%,100%{border-color:var(--text-muted)} 50%{border-color:#aaa} }
+
+  /* CALENDAR */
+  .calendar-card {
+    margin: 0 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .cal-month { font-family: 'Bebas Neue', sans-serif; font-size: 22px; letter-spacing: 2px; }
+  .cal-nav { display: flex; gap: 8px; }
+  .cal-nav-btn {
+    width: 28px; height: 28px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text-mid); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; transition: all 0.15s;
+  }
+  .cal-nav-btn:hover { border-color: var(--green); color: var(--green); }
+
+  .cal-days-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 6px; }
+  .cal-day-label {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    color: var(--text-muted); text-align: center; letter-spacing: 1px; padding: 4px 0;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+  .cal-cell {
+    aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; font-family: 'DM Mono', monospace;
+    font-size: 12px; color: var(--text-muted); transition: all 0.2s;
+  }
+  .cal-cell.current-month { color: var(--text-mid); }
+  .cal-cell.today { border: 1px solid var(--text-muted); color: var(--text); }
+  .cal-cell.worked-out { background: var(--green-dim); border: 1px solid rgba(0,255,135,0.3); color: var(--green); font-weight: 500; }
+  .cal-cell.worked-out.today { background: var(--green); color: #000; font-weight: 700; box-shadow: 0 0 12px var(--green-glow); border: none; }
+
+  /* SUMMARY */
+  .summary-card {
+    margin: 0 16px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+  }
+  .summary-stats { display: flex; }
+  .stat { flex: 1; text-align: center; padding: 0 10px; border-right: 1px solid var(--border); }
+  .stat:last-child { border-right: none; }
+  .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: var(--green); line-height: 1; text-shadow: 0 0 10px var(--green-glow); }
+  .stat-label { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-top: 4px; }
+  .progress-wrap { margin-top: 16px; }
+  .progress-label { display: flex; justify-content: space-between; font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); margin-bottom: 6px; }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--green), #00c6ff); border-radius: 2px; transition: width 0.5s ease; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--green); color: #000;
+    font-family: 'DM Mono', monospace; font-size: 12px; letter-spacing: 2px;
+    padding: 10px 20px; border-radius: 8px;
+    opacity: 0; transition: all 0.3s; pointer-events: none; z-index: 999; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @keyframes float-up { 0%{transform:translateY(0) scale(1);opacity:1} 100%{transform:translateY(-60px) scale(0);opacity:0} }
+  .confetti-dot { position: fixed; width: 6px; height: 6px; border-radius: 50%; pointer-events: none; z-index: 998; animation: float-up 0.8s ease-out forwards; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">GRIND / DAILY LOG</div>
+    <div class="tagline">I AM THE <span class="beast">BEAST</span> MYSELF!</div>
+    <div class="today-label" id="todayLabel"></div>
+  </header>
+
+  <div class="section-label">Hôm nay</div>
+
+  <div class="today-card">
+    <!-- PUSHUP -->
+    <div class="exercise-row" id="row-pushup">
+      <div class="ex-info">
+        <div class="ex-name">Hít đất</div>
+        <div class="ex-target">Mục tiêu tháng này: <span class="tnum" id="pushup-target">—</span> cái</div>
+      </div>
+      <div class="rep-input-wrap">
+        <input type="number" min="0" max="999" class="rep-input" id="pushup-input" placeholder="0" oninput="refreshUI()" />
+        <div class="check-icon" id="pushup-check">
+          <svg viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- SHOULDER -->
+    <div class="shoulder-section">
+      <div class="shoulder-header">Tập vai</div>
+      <div class="shoulder-parts" id="shoulder-parts">
+        <div class="shoulder-part">
+          <div class="part-label">Trước</div>
+          <input type="number" min="0" max="999" class="part-rep-input" id="shoulder-front-input" placeholder="0" oninput="refreshUI()" />
+        </div>
+        <div class="shoulder-part">
+          <div class="part-label">Giữa</div>
+          <input type="number" min="0" max="999" class="part-rep-input" id="shoulder-mid-input" placeholder="0" oninput="refreshUI()" />
+        </div>
+        <div class="shoulder-part">
+          <div class="part-label">Sau</div>
+          <input type="number" min="0" max="999" class="part-rep-input" id="shoulder-back-input" placeholder="0" oninput="refreshUI()" />
+        </div>
+      </div>
+      <div class="shoulder-footer">
+        Mục tiêu tháng này: <span class="tnum" id="shoulder-target">—</span> cái / phần
+      </div>
+    </div>
+  </div>
+
+  <button class="save-btn" id="saveBtn" onclick="saveToday()">LƯU HÔM NAY</button>
+
+  <div class="section-label">Streak</div>
+  <div class="streak-card">
+    <div class="streak-number" id="streakNum">0</div>
+    <div class="streak-info">
+      <div class="streak-title">🔥 Ngày liên tiếp</div>
+      <div class="streak-desc" id="streakDesc">Tập hôm nay để bắt đầu streak!</div>
+      <div class="streak-milestones" id="milestones"></div>
+    </div>
+  </div>
+
+  <div class="section-label">Lịch tháng</div>
+  <div class="calendar-card">
+    <div class="cal-header">
+      <div class="cal-month" id="calMonth"></div>
+      <div class="cal-nav">
+        <div class="cal-nav-btn" onclick="changeMonth(-1)">◀</div>
+        <div class="cal-nav-btn" onclick="changeMonth(1)">▶</div>
+      </div>
+    </div>
+    <div class="cal-days-header">
+      <div class="cal-day-label">CN</div><div class="cal-day-label">T2</div>
+      <div class="cal-day-label">T3</div><div class="cal-day-label">T4</div>
+      <div class="cal-day-label">T5</div><div class="cal-day-label">T6</div>
+      <div class="cal-day-label">T7</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+  </div>
+
+  <div class="section-label">Tổng kết tháng</div>
+  <div class="summary-card">
+    <div class="summary-stats">
+      <div class="stat"><div class="stat-num" id="monthDays">0</div><div class="stat-label">Buổi / tháng</div></div>
+      <div class="stat"><div class="stat-num" id="monthRate">0%</div><div class="stat-label">Tỉ lệ</div></div>
+      <div class="stat"><div class="stat-num" id="habitDays">0</div><div class="stat-label">Ngày / 90</div></div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-label"><span>Tiến độ 3 tháng</span><span id="habitPercent">0%</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="habitBar" style="width:0%"></div></div>
+    </div>
+  </div>
+
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const today = new Date();
+let calViewDate = new Date(today.getFullYear(), today.getMonth(), 1);
+
+// Monthly targets
+function getTargets(date) {
+  const m = (date || today).getMonth() + 1;
+  return {
+    pushup:   m <= 2 ? 50 : m === 3 ? 80 : 100,
+    shoulder: m <= 2 ? 30 : 40
+  };
+}
+
+const TARGETS = getTargets(today);
+const MILESTONES = [2, 7, 10, 21, 30, 50, 66, 90];
+
+document.getElementById('pushup-target').textContent = TARGETS.pushup;
+document.getElementById('shoulder-target').textContent = TARGETS.shoulder;
+
+// Storage
+const KEY_DATA = 'grind_data2';
+const KEY_STREAK = 'grind_streak2';
+const KEY_HABIT_START = 'grind_habit_start2';
+
+function getStorage(key, def) {
+  try { return JSON.parse(localStorage.getItem(key)) || (def !== undefined ? def : {}); }
+  catch { return def !== undefined ? def : {}; }
+}
+function setStorage(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+function dateKey(d) {
+  d = d || today;
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+function getVal(id) { return parseInt(document.getElementById(id).value) || 0; }
+
+// Load saved data for today
+function loadToday() {
+  const data = getStorage(KEY_DATA);
+  const rec = data[dateKey()];
+  if (!rec) return;
+  if (rec.pushup) document.getElementById('pushup-input').value = rec.pushup;
+  if (rec.front)  document.getElementById('shoulder-front-input').value = rec.front;
+  if (rec.mid)    document.getElementById('shoulder-mid-input').value = rec.mid;
+  if (rec.back)   document.getElementById('shoulder-back-input').value = rec.back;
+  refreshUI();
+}
+
+function refreshUI() {
+  const pushup = getVal('pushup-input');
+  const front  = getVal('shoulder-front-input');
+  const mid    = getVal('shoulder-mid-input');
+  const back   = getVal('shoulder-back-input');
+
+  const pi = document.getElementById('pushup-input');
+  const pDone = pushup >= TARGETS.pushup;
+  pi.classList.toggle('at-goal', pDone);
+  document.getElementById('pushup-check').classList.toggle('show', pDone);
+  document.getElementById('row-pushup').classList.toggle('done', pDone);
+
+  ['front','mid','back'].forEach(p => {
+    const v = getVal('shoulder-' + p + '-input');
+    document.getElementById('shoulder-' + p + '-input').classList.toggle('at-goal', v >= TARGETS.shoulder);
+  });
+
+  const allShoulder = front >= TARGETS.shoulder && mid >= TARGETS.shoulder && back >= TARGETS.shoulder;
+  document.getElementById('shoulder-parts').style.background = allShoulder ? 'rgba(0,255,135,0.05)' : '';
+}
+
+function isDayDone(d) {
+  const rec = (getStorage(KEY_DATA))[dateKey(d)];
+  if (!rec) return false;
+  return (rec.pushup||0) > 0 || (rec.front||0) > 0 || (rec.mid||0) > 0 || (rec.back||0) > 0;
+}
+
+function saveToday() {
+  const btn = document.getElementById('saveBtn');
+  const data = getStorage(KEY_DATA);
+  data[dateKey()] = {
+    pushup: getVal('pushup-input'),
+    front:  getVal('shoulder-front-input'),
+    mid:    getVal('shoulder-mid-input'),
+    back:   getVal('shoulder-back-input')
+  };
+  setStorage(KEY_DATA, data);
+
+  updateStreak();
+  renderCalendar();
+  renderSummary();
+
+  btn.textContent = '✓ ĐÃ LƯU';
+  btn.classList.add('saved');
+  setTimeout(() => { btn.textContent = 'LƯU HÔM NAY'; btn.classList.remove('saved'); }, 2000);
+
+  showToast('Đã lưu 💪');
+  spawnConfetti();
+}
+
+// Streak
+function updateStreak() {
+  let streak = getStorage(KEY_STREAK, { count: 0, lastDate: null });
+  const tk = dateKey();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yk = dateKey(yesterday);
+
+  if (streak.lastDate === tk) { /* already today */ }
+  else if (!streak.lastDate || streak.lastDate === yk) { streak.count += 1; streak.lastDate = tk; }
+  else { streak.count = 1; streak.lastDate = tk; }
+
+  setStorage(KEY_STREAK, streak);
+  renderStreak(streak.count);
+}
+
+function renderStreak(count) {
+  document.getElementById('streakNum').textContent = count;
+  const msgs = [[90,'90 NGÀY. LEGEND.'],[66,'66 ngày — thói quen tự động hoá!'],[30,'Một tháng. Không nghỉ.'],[21,'21 ngày — mốc tạo thói quen!'],[14,'Hai tuần. Không dừng lại!'],[7,'Một tuần rồi. Đang bốc.'],[3,'Đang warm up.'],[1,'Ngày đầu tiên. Bắt đầu!'],[0,'Tập hôm nay để bắt đầu streak!']];
+  document.getElementById('streakDesc').textContent = msgs.find(([d]) => count >= d)[1];
+
+  const c = document.getElementById('milestones');
+  c.innerHTML = '';
+  let nextSet = false;
+  MILESTONES.forEach(m => {
+    const el = document.createElement('div');
+    el.className = 'milestone' + (count >= m ? ' reached' : (!nextSet ? (nextSet=true, ' next') : ''));
+    el.textContent = '×' + m;
+    c.appendChild(el);
+  });
+}
+
+// Calendar
+function renderCalendar() {
+  const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+  document.getElementById('calMonth').textContent = 'THÁNG ' + (m+1) + ' / ' + y;
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  const first = new Date(y, m, 1).getDay();
+  const days  = new Date(y, m+1, 0).getDate();
+  const tk    = dateKey();
+  for (let i = 0; i < first; i++) { const c = document.createElement('div'); c.className = 'cal-cell'; grid.appendChild(c); }
+  for (let d = 1; d <= days; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell current-month';
+    cell.textContent = d;
+    const cd = new Date(y, m, d);
+    if (dateKey(cd) === tk) cell.classList.add('today');
+    if (isDayDone(cd)) cell.classList.add('worked-out');
+    grid.appendChild(cell);
+  }
+}
+
+function changeMonth(delta) {
+  calViewDate.setMonth(calViewDate.getMonth() + delta);
+  renderCalendar();
+  renderSummary();
+}
+
+// Summary
+function renderSummary() {
+  const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+  const days = new Date(y, m+1, 0).getDate();
+  let worked = 0;
+  for (let d = 1; d <= days; d++) { if (isDayDone(new Date(y, m, d))) worked++; }
+  const passed = (y === today.getFullYear() && m === today.getMonth()) ? today.getDate() : days;
+  const rate = passed > 0 ? Math.round(worked / passed * 100) : 0;
+
+  document.getElementById('monthDays').textContent = worked;
+  document.getElementById('monthRate').textContent = rate + '%';
+
+  if (!localStorage.getItem(KEY_HABIT_START)) localStorage.setItem(KEY_HABIT_START, dateKey());
+  const total = Object.keys(getStorage(KEY_DATA)).length;
+  document.getElementById('habitDays').textContent = total;
+  const pct = Math.min(100, Math.round(total / 90 * 100));
+  document.getElementById('habitPercent').textContent = pct + '%';
+  document.getElementById('habitBar').style.width = pct + '%';
+}
+
+// Helpers
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function spawnConfetti() {
+  const rect = document.getElementById('saveBtn').getBoundingClientRect();
+  const colors = ['#00ff87','#00c6ff','#ffd700','#ff4d4d'];
+  for (let i = 0; i < 14; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'confetti-dot';
+    dot.style.cssText = 'left:' + (rect.left + Math.random() * rect.width) + 'px;top:' + rect.top + 'px;background:' + colors[i%4] + ';animation-delay:' + (Math.random()*.3) + 's';
+    document.body.appendChild(dot);
+    setTimeout(() => dot.remove(), 1100);
+  }
+}
+
+// Init
+(function() {
+  const days = ['CN','T2','T3','T4','T5','T6','T7'];
+  document.getElementById('todayLabel').textContent = days[today.getDay()] + ' ' + today.getDate() + '/' + (today.getMonth()+1) + '/' + today.getFullYear();
+  loadToday();
+  renderStreak(getStorage(KEY_STREAK, {count:0}).count);
+  renderCalendar();
+  renderSummary();
+})();
+</script>
+</body>
+</html>
